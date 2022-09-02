@@ -3,12 +3,21 @@ import numpy as np
 import csv
 import pandas as pd
 from datetime import date
+from datetime import datetime
 import os
 import time
+import random
 from Trial_struct import *
+import gui
 import get_param
 import serial
+import pygame
+import sys
+from os.path import exists
+from os import walk
+
 arduinoData = serial.Serial('COM6', 115200)
+arduinoData2 = serial.Serial('COM7', 115200)
 
 class Start_Recording():
     def __init__(self, len_trial_rec, eeg_filename, event_filename ,TestsignaleEnabled ,trial_number,  patient_name, Unicorn_id, task_number):
@@ -68,71 +77,168 @@ class Start_Recording():
         #running for different trials
         states = self.choose_random_state(self.trial)
         
-        
-        self.device.StartAcquisition(self.TestsignaleEnabled)
-        for j in range(self.trial):
-            receiveBufferBufferLength = self.FrameLength * self.numberOfAcquiredChannels * 4
-            receiveBuffer = bytearray(receiveBufferBufferLength)
-            
-            print("Data acquisition started.")
+        while True:
+            for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        pygame.quit()
+                        sys.exit()
 
-            numberOfGetDataCalls = int(self.AcquisitionDurationInSeconds * self.SamplingRate / self.FrameLength)
-            # Limit console update rate to max. 25Hz or slower to prevent acquisition timing issues.                   
-            consoleUpdateRate = int((self.SamplingRate / self.FrameLength) / 25.0)
-            if consoleUpdateRate == 0:
-                consoleUpdateRate = 1
+            self.device.StartAcquisition(self.TestsignaleEnabled)
+            for j in range(self.trial):
+                #Trial 
 
-        
-            sr = self.SamplingRate
-            self.current_eeg = eeg_path + "/" + str(j) + "_"+ self.task_number + "_"+ self.EEG_file_name
-            file = open(self.current_eeg, "a")
-            file.write(self.header)
-
-            initial_data = []
-            # i is sample point in trial j 
-            count = 0
-            for i in range (0,numberOfGetDataCalls):
-                # Receives the configured number of samples from the Unicorn device and writes it to the acquisition buffer.
-                self.device.GetData(self.FrameLength,receiveBuffer,receiveBufferBufferLength)
-            
-                # Convert receive buffer to numpy float array 
-                dataa = np.frombuffer(receiveBuffer, dtype=np.float32, count=self.numberOfAcquiredChannels * self.FrameLength)
-                data = np.reshape(dataa, (self.FrameLength, self.numberOfAcquiredChannels))
-                #write 
-                data[0][15] = count 
+                receiveBufferBufferLength = self.FrameLength * self.numberOfAcquiredChannels * 4
+                receiveBuffer = bytearray(receiveBufferBufferLength)
                 
-                AR = Arduino(initial_data, count , sr, states[j],arduinoData)
-                if self.task_number =="task_1" or self.task_number =="task_3" or self.task_number =="task_4" or self.task_number =="task_5" :
-                    initial_data = AR.task_1()
+                print("Data acquisition started.")
 
-                elif self.task_number == "task_2":
-                    initial_data = AR.task_2()
+                numberOfGetDataCalls = int(self.AcquisitionDurationInSeconds * self.SamplingRate / self.FrameLength)
+                # Limit console update rate to max. 25Hz or slower to prevent acquisition timing issues.                   
+                consoleUpdateRate = int((self.SamplingRate / self.FrameLength) / 25.0)
+                if consoleUpdateRate == 0:
+                    consoleUpdateRate = 1
 
-                np.savetxt(file,data,delimiter=',',fmt='%.3f',newline='\n')
+            
+                sr = self.SamplingRate
+                self.current_eeg = eeg_path + "/" + str(j) + "_"+ self.task_number + "_"+ self.EEG_file_name
+                file = open(self.current_eeg, "a")
+                file.write(self.header)
+                file.write('\n')
+
+                initial_data = []
+                # i is sample point in trial j 
+                count = 0
+                for i in range (0,numberOfGetDataCalls):
+                    # Receives the configured number of samples from the Unicorn device and writes it to the acquisition buffer.
+                    self.device.GetData(self.FrameLength,receiveBuffer,receiveBufferBufferLength)
                 
-                # Update console to indicate that the data acquisition is running.
-                count += 1
-                if count % consoleUpdateRate == 0:
-                    print('.',end='',flush=True)
-    
+                    # Convert receive buffer to numpy float array 
+                    dataa = np.frombuffer(receiveBuffer, dtype=np.float32, count=self.numberOfAcquiredChannels * self.FrameLength)
+                    data = np.reshape(dataa, (self.FrameLength, self.numberOfAcquiredChannels))
+                    #write 
+                    data[0][15] = count 
 
-            self.current_event = event_path + "/" + str(j) + "_"+ self.task_number + "_"+ self.event_file_name
-            array = np.array(initial_data)
-            pd.DataFrame(array).to_csv(  self.current_event ,header=["glass_event", "Buzzer_event","motor_turning_event","events","TursnStart", "sample_number"], index=False)
+                    gui.display_surface.fill((255, 255, 255))
+                    if j == 0:
+                        gui.display_surface.blit(gui.text4, gui.textRect4)
 
-            #convert a list to data frame to store in a csv file 
-            print("Data ", str(j) , "acquisition stopped.")
-            
+                    elif j == 1:
+                        gui.display_surface.blit(gui.text5, gui.textRect5)
 
-            # Close device.
-            #-------------------------------------------------------------------------------------
-            
+                    elif j == 2:
+                        gui.display_surface.blit(gui.text6, gui.textRect6)
+
+                    elif j == 3:
+                        gui.display_surface.blit(gui.text7, gui.textRect7)
+
+                    elif j == 4:
+                        gui.display_surface.blit(gui.text8, gui.textRect8)
+
+                    AR = Arduino(initial_data, count , sr, states[j],arduinoData,arduinoData2)
+                    if self.task_number =="task_1" or self.task_number =="task_3" or self.task_number =="task_4" or self.task_number =="task_5" :
+                        initial_data = AR.task_1()
+
+                    elif self.task_number == "task_2":
+                        initial_data = AR.task_2()
+
+                    np.savetxt(file,data,delimiter=',',fmt='%.3f',newline='\n')
+                    
+                    pygame.display.update()
+                    # Update console to indicate that the data acquisition is running.
+                    count += 1
+                    if count % consoleUpdateRate == 0:
+                        print('.',end='',flush=True)
+
+                    
+
+                self.current_event = event_path[0] + "/" + str(j) + "_"+ self.task_number + "_"+ self.event_file_name
+                array = np.array(initial_data)
+                pd.DataFrame(array).to_csv(  self.current_event ,header=["glass_event", "Buzzer_event","motor_turning_event","events","TursnStart", "sample_number"], index=False)
+                file.close()
+
+                #convert a list to data frame to store in a csv file 
+                print("Data ", str(j) , "acquisition stopped.")
+
             print("Disconnected from Unicorn")
-            file.close()
-        del receiveBuffers
-        self.device.StopAcquisition()
-        del self.device
+            self.TextFile(event_path[1])
+            del receiveBuffer
+            self.device.StopAcquisition()
+            del self.device
+            sys.exit()
+        
+    def TextFile(self,path):
 
+        today = date.today()
+        dateee = today.strftime("%Y/%m/%d")
+
+        now = datetime.now()
+        current_time = now.strftime("%H:%M:%S")
+
+        save_path = path + "/"
+        complete_path = os.path.join(save_path, self.patient_name +".txt")
+
+        task = ["task_1","task_2","task_3","task_4","task_5"]
+        count = [0,0,0,0,0]
+        total = 0
+        trial_num = {"task_1": 0, "task_2": 0,"task_3":0,"task_4":0,"task_5":0 }
+
+        for j,i in enumerate(task):
+            dir_path = os.path.join( path, i)
+            
+            for x in os.walk(dir_path):
+                if x[0].find('event') !=-1:
+                    count[j] += len(x[2])
+                    trial_num[i] = len(x[2])
+                    total += len(x[2])
+            
+
+        
+
+        file_exists = exists(complete_path)
+        if file_exists:
+            with open(complete_path, 'a') as f:
+                f.write('\n')
+                f.write(''.join(task[0] + " : " + str(count[0])  + " csv files" + "  ( trial number =" + str(trial_num["task_1"]) +")"))
+                f.write('\n')
+                f.write(''.join(task[1] + " : " + str(count[1]) + " csv files"  + "  ( trial number =" + str(trial_num["task_2"]) +")"))
+                f.write('\n')
+                f.write(''.join(task[2] + " : " + str(count[2]) + " csv files"  + "  ( trial number =" + str(trial_num["task_3"]) +")"))
+                f.write('\n')
+                f.write(''.join(task[3] + " : " + str(count[3]) + " csv files"  + "  ( trial number =" + str(trial_num["task_4"]) +")"))
+                f.write('\n')
+                f.write(''.join(task[4] + " : " + str(count[4]) + " csv files"  + "  ( trial number =" + str(trial_num["task_5"]) +")"))
+                f.write('\n')
+                f.write(''.join("Total " + " : " + str(total) + " csv files"))
+                f.write('\n')
+                f.write('------------------------------------------------------------------')
+                f.write('\n')
+                f.write('\n')
+            f.close()
+
+        else:
+            more_lines = ["Patient_name :" + self.patient_name, "Date :" +dateee , "Time :" +current_time]
+            with open(complete_path, 'w') as f:
+                f.write('\n'.join(more_lines))
+                f.write('\n')
+                f.write('\n')
+                f.write('\n')
+                f.write('\n')
+                f.write(''.join(task[0] + " : " + str(count[0]) + " csv files" + "  ( trial number =" + str(trial_num["task_1"]) +")"))
+                f.write('\n')
+                f.write(''.join(task[1] + " : " + str(count[1]) + " csv files" + "  ( trial number =" + str(trial_num["task_2"]) +")"))
+                f.write('\n')
+                f.write(''.join(task[2] + " : " + str(count[2]) + " csv files" + "  ( trial number =" + str(trial_num["task_3"]) +")"))
+                f.write('\n')
+                f.write(''.join(task[3] + " : " + str(count[3])+ " csv files"  + "  ( trial number =" + str(trial_num["task_4"]) +")"))
+                f.write('\n')
+                f.write(''.join(task[4] + " : " + str(count[4])+ " csv files"  + "  ( trial number =" + str(trial_num["task_5"]) +")"))
+                f.write('\n')
+                f.write(''.join("Total " + " : " + str(total)+ " csv files"))
+                f.write('\n')
+                f.write('------------------------------------------------------------------')
+                f.write('\n')
+                f.write('\n')
+            f.close()
 
     def make_dir(self, pathname):
         os.chdir('C:\\Users\\annacetera\\Documents')
@@ -140,23 +246,28 @@ class Start_Recording():
         path = os.path.join(curworkdir, "EEGdata") 
         #patient_name
         today = date.today()
-        dateee = today.strftime("%b-%d-%Y")
+        
+        dateee = today.strftime("%Y%m%d")
         path = os.path.join(path, dateee) 
 
         directory = self.patient_name
         path = os.path.join(path, directory)  
 
         directory = self.task_number
-        path = os.path.join(path, directory)  
+        path1 = os.path.join(path, directory)
+
+        #add time to directory
+        now = datetime.now()
+        current_time = now.strftime("%H%M%S")
+        path2 = os.path.join(path1, current_time)
+
 
         directory = pathname
-        path = os.path.join(path, directory)  
+        path3 = os.path.join(path2, directory)  
 
-        if not os.path.exists(path):
-
-            
-            os.makedirs(path)  
-        return path
+        if not os.path.exists(path3):
+            os.makedirs(path3)  
+        return path3, path
 
     def choose_random_state(self,trial_number):
         states = [1,2]
@@ -190,11 +301,15 @@ class Start_Recording():
             trial_list.append([a[0],b[0],a[1],b[1],a[2]])
         return trial_list
 
+
+
     def main(self):
-        eeg_path = self.make_dir("eeg")
+        eeg_path , secpath = self.make_dir("eeg")
         event_path = self.make_dir("event")
         self.eeg_connect()
         self.start_acquisition(eeg_path, event_path)
+        
+        
 
 data_recording = Start_Recording(len_trial_rec = get_param.Trial_duration, 
                                 eeg_filename = "EEG.csv", 
@@ -205,6 +320,7 @@ data_recording = Start_Recording(len_trial_rec = get_param.Trial_duration,
                                 Unicorn_id  = get_param.Unicorn_ID,
                                 task_number = get_param.task_list)
 data_recording.main()
+
 
 
 

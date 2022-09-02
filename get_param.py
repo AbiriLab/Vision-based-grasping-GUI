@@ -1,13 +1,12 @@
 #defining all of the variable which are used in the project 
 
-#Unicorn_ID = 'UN-2021.05.36' #if you know put the number otherwise put 0
-#Unicorn_ID = 'UN-2021.05.36' #if you know put the number otherwise put 0
-Unicorn_ID = False
+Unicorn_ID = 'UN-2021.05.37' #if you know put the number otherwise put 0
+#Unicorn_ID = False
 
-Username = "Anna" #full name of patient
+Username = "Test" #full name of patient
 
-Trial_number = 2 #how many trial that you want to run
+Trial_number = 1 #how many trial that you want to run
 
-Trial_duration = 42 #how long is each one of your trial
+Trial_duration = 53 #how long is each one of your trial, previous time = 42 seconds
 
-task_list = "task_1"
+task_list = "task_3" #/task_2/ task_3/ task_4 /task_5
